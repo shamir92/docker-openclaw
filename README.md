@@ -26,7 +26,9 @@ Files in this folder:
 | `caddy/Dockerfile` | Optional — only for the Let's Encrypt DNS-01 alternative (not used by default) |
 | `caddy/Caddyfile` | TLS (Origin cert) + reverse proxy + Access→header mapping |
 | `caddy/certs/` | Drop your Cloudflare Origin cert (`origin.pem`) + key (`origin-key.pem`) here |
-| `.env.example` | Just your domain (no API token needed with Origin cert) |
+| `.env.example` | Domains + Hermes Basic Auth creds (no API token needed with Origin cert) |
+
+> **Running Hermes Agent too?** See [Adding Hermes Agent on a second domain](#adding-hermes-agent-on-a-second-domain) at the bottom. If so, generate your Origin cert as a **wildcard** `*.example.com` in step 2 so it covers both hostnames.
 | `openclaw/config/openclaw.gateway-snippet.json` | The `gateway` block to merge into the generated config |
 | `scripts/lock-origin-to-cloudflare.sh` | Firewall the origin to Cloudflare IPs (**required**) |
 
@@ -162,6 +164,51 @@ curl -m 5 -k https://<SERVER_PUBLIC_IP>/ -H "Host: openclaw.example.com" ; echo
 ```
 
 Add your LLM provider API keys from inside the Control UI once you're in.
+
+---
+
+## Adding Hermes Agent on a second domain
+
+Hermes Agent (`nousresearch/hermes-agent`) is a **separate** agent framework, not
+part of OpenClaw. This stack already includes a `hermes` service; you just enable
+the domain and auth. The whole edge layer (Cloudflare proxy, Origin cert, Caddy,
+origin firewall) is shared — no changes to `lock-origin-to-cloudflare.sh` needed
+since both domains ride the same Caddy `:443`.
+
+**Key difference from OpenClaw:** Hermes has **no trusted-proxy header auth**. Its
+dashboard requires Basic Auth / Nous OAuth / OIDC and fails closed on a non-loopback
+bind without one. So we protect it with **two layers**:
+
+1. **Cloudflare Access** at the edge (the real SSO gate) — same as OpenClaw.
+2. **Hermes Basic Auth** (set via `HERMES_USER` / `HERMES_PASSWORD` in `.env`) — satisfies
+   Hermes' fail-closed rule and adds defense-in-depth if the edge is ever bypassed.
+
+Steps:
+
+1. **Cert:** in step 2, create the Cloudflare Origin cert for `*.example.com` (wildcard)
+   so the one `origin.pem` covers both `openclaw.` and `hermes.`. (If you already made a
+   single-host cert, regenerate it as a wildcard.)
+2. **DNS:** add an **A** record `hermes` → your server IP, **Proxied (orange)**.
+3. **Access:** create a *second* Zero Trust → Access → Self-hosted application for
+   `hermes.example.com`, with its own Allow policy (your email). (Same as §3.)
+4. **`.env`:** set `HERMES_DOMAIN`, `HERMES_USER`, `HERMES_PASSWORD`.
+5. **Verify the dashboard bind knob.** The compose sets `HERMES_DASHBOARD=1` +
+   `HERMES_DASHBOARD_HOST=0.0.0.0` so Caddy can reach it. Confirm the exact flag/env
+   with `docker run --rm nousresearch/hermes-agent:latest gateway run --help`. If it
+   differs, override the service `command:` instead, e.g.
+   `command: dashboard --host 0.0.0.0 --port 9119 --no-open`.
+6. **Start:** `docker compose up -d hermes && docker compose logs -f hermes`
+   (watch for the dashboard listening on `0.0.0.0:9119`, no fail-closed error).
+7. Browse to `https://hermes.example.com` → Cloudflare Access login → then the Hermes
+   Basic Auth prompt → dashboard. Add your LLM provider key in Hermes' config afterward.
+
+> **UX note:** you log in twice (Access, then Basic Auth). To get single sign-on and
+> drop the second prompt, use Hermes' **OIDC** provider with Cloudflare Access as the
+> IdP (`HERMES_DASHBOARD_OIDC_ISSUER` / `_OIDC_CLIENT_ID` / `_OIDC_SCOPES`, created as an
+> Access "SaaS → OIDC" application). More setup, but true SSO.
+
+Sources: [Hermes web dashboard docs](https://hermes-agent.nousresearch.com/docs/user-guide/features/web-dashboard) ·
+[Hermes configuration](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/configuration.md)
 
 ---
 

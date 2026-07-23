@@ -1,3 +1,4 @@
+# ── OpenClaw (trusted-proxy auth) ─────────────────────────────────────────
 {$DOMAIN} {
 	# Cloudflare Origin Certificate (the Cloudflare -> origin leg).
 	# Requires Cloudflare SSL/TLS mode = Full (strict) and a proxied (orange) record.
@@ -14,4 +15,17 @@
 		# Caddy already sets X-Forwarded-Proto and X-Forwarded-Host by default,
 		# which OpenClaw's requiredHeaders expects.
 	}
+}
+
+# ── Hermes Agent (Cloudflare Access + Hermes Basic Auth) ──────────────────
+# Hermes has NO trusted-proxy header auth, so we do NOT forward X-Forwarded-User.
+# Access gates the edge; Hermes' own Basic Auth is configured in docker-compose.yml.
+{$HERMES_DOMAIN} {
+	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin-key.pem
+
+	encode zstd gzip
+
+	# Caddy auto-sets X-Forwarded-Host / X-Forwarded-Proto, which Hermes uses to
+	# reconstruct its OAuth callback URL (HERMES_DASHBOARD_PUBLIC_URL also set).
+	reverse_proxy hermes:9119
 }

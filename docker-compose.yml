@@ -7,6 +7,9 @@ networks:
       config:
         - subnet: 172.28.0.0/24
 
+volumes:
+  hermes_data:
+
 services:
   caddy:
     image: caddy:2                       # stock image — no custom build needed
@@ -21,13 +24,15 @@ services:
       - "443:443/udp"   # HTTP/3
     environment:
       DOMAIN: ${DOMAIN}
+      HERMES_DOMAIN: ${HERMES_DOMAIN}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./caddy/certs:/etc/caddy/certs:ro   # Cloudflare Origin cert + key live here
+      - ./caddy/certs:/etc/caddy/certs:ro   # Cloudflare Origin cert + key (wildcard covers both domains)
       - ./caddy/data:/data
       - ./caddy/config:/config
     depends_on:
       - openclaw-gateway
+      - hermes
 
   openclaw-gateway:
     image: ghcr.io/openclaw/openclaw:latest   # pin a version tag in production
@@ -44,3 +49,29 @@ services:
     volumes:
       - ./openclaw/config:/home/node/.openclaw
       - ./openclaw/secret:/home/node/.config/openclaw
+
+  hermes:
+    image: nousresearch/hermes-agent:latest
+    container_name: hermes
+    restart: unless-stopped
+    command: gateway run
+    networks:
+      edge:
+        ipv4_address: 172.28.0.4
+    expose:
+      - "9119"           # dashboard, internal only — NOT published to the host
+    environment:
+      HERMES_DASHBOARD: "1"
+      # Dashboard must listen on the container interface so Caddy can reach it.
+      # VERIFY this knob name against `docker run --rm nousresearch/hermes-agent:latest gateway run --help`.
+      # If HERMES_DASHBOARD_HOST is wrong, override the command instead, e.g.:
+      #   command: dashboard --host 0.0.0.0 --port 9119 --no-open
+      HERMES_DASHBOARD_HOST: "0.0.0.0"
+      HERMES_DASHBOARD_PORT: "9119"
+      HERMES_DASHBOARD_PUBLIC_URL: "https://${HERMES_DOMAIN}"
+      # Hermes fails closed on a non-loopback bind unless an auth provider is set.
+      # Basic Auth satisfies that + is defense-in-depth behind Cloudflare Access.
+      HERMES_DASHBOARD_BASIC_AUTH_USERNAME: ${HERMES_USER}
+      HERMES_DASHBOARD_BASIC_AUTH_PASSWORD: ${HERMES_PASSWORD}
+    volumes:
+      - hermes_data:/opt/data
