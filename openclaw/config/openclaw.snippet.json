@@ -8,14 +8,7 @@
     "auth": {
       "mode": "trusted-proxy",
       "trustedProxy": {
-        "userHeader": "x-forwarded-user",
-        "requiredHeaders": ["x-forwarded-proto", "x-forwarded-host"],
-        "allowUsers": ["you@example.com"],
-        "allowLoopback": false,
-        "deviceAutoApprove": {
-          "enabled": true,
-          "scopes": ["operator.read", "operator.write", "operator.approvals"]
-        }
+        "userHeader": "x-forwarded-user"
       }
     }
   }

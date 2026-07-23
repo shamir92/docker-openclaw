@@ -127,8 +127,13 @@ no auth config), which surfaces later as confusing "no trustedProxy config" erro
 Edit these values:
 
 - `controlUi.allowedOrigins` → `["https://<your OpenClaw domain>"]` (exact, with `https://`; the key is under `gateway.controlUi`, **not** `gateway.allowedOrigins`)
-- `allowUsers`     → your Cloudflare Access email(s)
 - `trustedProxies` → keep `["172.28.0.2/32"]` (Caddy's fixed IP from compose)
+
+The `trustedProxy` block is intentionally minimal (`userHeader` only) — it validates
+cleanly, and Cloudflare Access already restricts *who* can reach the gateway. Optional
+extras like `allowUsers` / `deviceAutoApprove` have build-specific schemas; add them
+only after confirming shapes with `docker compose run --rm --no-deps openclaw-gateway
+node openclaw.mjs doctor`.
 
 `gateway.auth.mode: "trusted-proxy"` supplies the auth, so no gateway token is
 needed — and it must **not** be set (the two are mutually exclusive).
