@@ -1,15 +1,137 @@
 {
   "gateway": {
     "bind": "lan",
-    "trustedProxies": ["172.28.0.2/32"],
+    "trustedProxies": [
+      "172.28.0.2/32"
+    ],
     "controlUi": {
-      "allowedOrigins": ["https://openclaw.example.com"]
+      "allowedOrigins": [
+        "https://openclaw.example.com"
+      ],
+      "dangerouslyDisableDeviceAuth": true
     },
     "auth": {
       "mode": "trusted-proxy",
       "trustedProxy": {
-        "userHeader": "x-forwarded-user"
+        "userHeader": "x-forwarded-user",
+        "requiredHeaders": [
+          "x-forwarded-proto",
+          "x-forwarded-host"
+        ],
+        "allowUsers": [
+          "example@example.com"
+        ]
       }
     }
+  },
+  "meta": {
+    "lastTouchedVersion": "2026.6.34",
+    "lastTouchedAt": "2026-07-23T09:19:23.226Z"
+  },
+  "skills": {
+    "entries": {
+      "1password": {
+        "enabled": false
+      },
+      "blogwatcher": {
+        "enabled": false
+      },
+      "blucli": {
+        "enabled": false
+      },
+      "camsnap": {
+        "enabled": false
+      },
+      "coding-agent": {
+        "enabled": false
+      },
+      "eightctl": {
+        "enabled": false
+      },
+      "gemini": {
+        "enabled": false
+      },
+      "gh-issues": {
+        "enabled": false
+      },
+      "gifgrep": {
+        "enabled": false
+      },
+      "github": {
+        "enabled": false
+      },
+      "gog": {
+        "enabled": false
+      },
+      "goplaces": {
+        "enabled": false
+      },
+      "himalaya": {
+        "enabled": false
+      },
+      "mcporter": {
+        "enabled": false
+      },
+      "nano-pdf": {
+        "enabled": false
+      },
+      "obsidian": {
+        "enabled": false
+      },
+      "openai-whisper": {
+        "enabled": false
+      },
+      "openai-whisper-api": {
+        "enabled": false
+      },
+      "openhue": {
+        "enabled": false
+      },
+      "oracle": {
+        "enabled": false
+      },
+      "ordercli": {
+        "enabled": false
+      },
+      "sag": {
+        "enabled": false
+      },
+      "session-logs": {
+        "enabled": false
+      },
+      "sherpa-onnx-tts": {
+        "enabled": false
+      },
+      "songsee": {
+        "enabled": false
+      },
+      "sonoscli": {
+        "enabled": false
+      },
+      "spotify-player": {
+        "enabled": false
+      },
+      "summarize": {
+        "enabled": false
+      },
+      "tmux": {
+        "enabled": false
+      },
+      "trello": {
+        "enabled": false
+      },
+      "video-frames": {
+        "enabled": false
+      },
+      "xurl": {
+        "enabled": false
+      }
+    }
+  },
+  "wizard": {
+    "lastRunAt": "2026-07-23T09:19:22.995Z",
+    "lastRunVersion": "2026.6.34",
+    "lastRunCommand": "doctor",
+    "lastRunMode": "local"
   }
 }

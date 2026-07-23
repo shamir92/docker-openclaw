@@ -129,11 +129,14 @@ Edit these values:
 - `controlUi.allowedOrigins` → `["https://<your OpenClaw domain>"]` (exact, with `https://`; the key is under `gateway.controlUi`, **not** `gateway.allowedOrigins`)
 - `trustedProxies` → keep `["172.28.0.2/32"]` (Caddy's fixed IP from compose)
 
-The `trustedProxy` block is intentionally minimal (`userHeader` only) — it validates
-cleanly, and Cloudflare Access already restricts *who* can reach the gateway. Optional
-extras like `allowUsers` / `deviceAutoApprove` have build-specific schemas; add them
-only after confirming shapes with `docker compose run --rm --no-deps openclaw-gateway
-node openclaw.mjs doctor`.
+The `trustedProxy` block is **minimal (`userHeader` only)** — the only shape confirmed to
+validate on build `2026.6.34`. On this build, `allowUsers` **and** `deviceAutoApprove` (in
+every shape tried: `{enabled:true}` and `{enabled, scopes}`) fail with
+`gateway.auth.trustedProxy: Invalid input`. Consequence: OpenClaw shows a **one-time
+device-pairing prompt per browser** — just approve it once. Cloudflare Access already
+restricts *who* can reach the gateway. To crack the real schema later, inspect the
+failure detail in `openclaw/config/logs/stability/*startup_failed.json`, or run
+`docker compose exec openclaw-gateway node openclaw.mjs doctor --fix` (backs up to `.bak`).
 
 `gateway.auth.mode: "trusted-proxy"` supplies the auth, so no gateway token is
 needed — and it must **not** be set (the two are mutually exclusive).
