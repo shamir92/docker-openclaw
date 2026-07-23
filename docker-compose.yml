@@ -40,7 +40,7 @@ services:
     # Headless deploy: skip the interactive `setup` gate; trusted-proxy auth from
     # openclaw.json is still applied. (Image entrypoint is tini; default CMD is
     # `node openclaw.mjs gateway`, which we extend with the flag.)
-    command: ["node", "openclaw.mjs", "gateway", "--allow-unconfigured"]
+    command: ["node", "openclaw.mjs", "gateway", "--allow-unconfigured", "--auth", "trusted-proxy"]
     restart: unless-stopped
     networks:
       edge:
