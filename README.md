@@ -157,10 +157,6 @@ sudo systemctl enable --now cloudflare-lock.service
 # 3. Verify
 systemctl status cloudflare-lock.service --no-pager
 sudo iptables -S DOCKER-USER          # should list Cloudflare ranges then a DROP on :443
-
-# Also allow SSH from your admin IP and enable ufw for host-level (non-Docker) ports:
-sudo ufw allow from <YOUR_ADMIN_IP> to any port 22 proto tcp
-sudo ufw --force enable
 ```
 
 > **Don't** use `iptables-persistent` / `netfilter-persistent save` on a Docker
@@ -168,6 +164,30 @@ sudo ufw --force enable
 > chains and can break container networking. The systemd unit above rebuilds the
 > rules fresh against the live chain instead, which is conflict-free. To refresh
 > Cloudflare's IP list later: `sudo systemctl restart cloudflare-lock.service`.
+
+### Host / SSH firewall (Contabo network firewall)
+
+SSH and general host-port filtering are handled at the **Contabo firewall**
+(upstream of the server), not `ufw`. That's the better layer: a provider network
+firewall sits *in front of* the host, so — unlike `ufw` — it is **not** bypassed by
+Docker's iptables rules.
+
+- **`ufw` is not needed** for this stack and is best left disabled. (The only host
+  port was SSH, which Contabo gates; Caddy's 80/443 are Docker-published and bypass
+  `ufw` anyway.) Note: if you *did* enable `ufw`, you'd still need an explicit
+  `allow 22` rule on the host — `ufw` runs on the host *after* Contabo, so a
+  default-deny would drop SSH even though Contabo permitted it. Skipping `ufw`
+  avoids that lockout risk.
+- **In the Contabo firewall, make sure inbound `tcp/443` is allowed** so Cloudflare
+  can reach the origin (allow from Cloudflare's ranges, or from anywhere and let
+  `cloudflare-lock.service` do the filtering). Port 80 to the origin is **not**
+  needed — you're using a Cloudflare Origin cert (no ACME), and Cloudflare does
+  http→https at the edge.
+- **SSH:** allow `tcp/22` from your admin IP only, in the Contabo firewall.
+- Optional extra layer: you *can* also restrict `443` to Cloudflare ranges at the
+  Contabo firewall, but those ranges change and Contabo rules are manual — so keep
+  `cloudflare-lock.service` (auto-updating) as the primary lock and treat Contabo
+  as a coarse backstop.
 
 ## 8. Verify
 
