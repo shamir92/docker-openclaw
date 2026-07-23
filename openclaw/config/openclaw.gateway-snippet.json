@@ -1,6 +1,6 @@
 {
   "gateway": {
-    "bind": "all",
+    "bind": "lan",
     "allowedOrigins": ["https://openclaw.example.com"],
     "trustedProxies": ["172.28.0.2/32"],
     "auth": {

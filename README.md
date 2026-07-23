@@ -108,35 +108,43 @@ mkdir -p openclaw/config openclaw/secret caddy/data caddy/config
 sudo chown -R 1000:1000 openclaw/config openclaw/secret
 ```
 
-## 5. First start (generate default config)
+## 5. Create the gateway config
 
-Bring up the gateway once so it writes a default `openclaw.json`:
+With `OPENCLAW_SKIP_ONBOARDING=1` the gateway does **not** generate a default
+config — you supply it. (`gateway.mode` defaults to `remote`, which requires auth;
+without a config it exits 78 "Missing config".) Create `openclaw.json` from the
+provided snippet:
+
+```bash
+sudo cp openclaw/config/openclaw.gateway-snippet.json openclaw/config/openclaw.json
+sudo nano openclaw/config/openclaw.json      # edit the values below
+sudo chown 1000:1000 openclaw/config/openclaw.json
+```
+
+Edit these values:
+
+- `allowedOrigins` → `["https://<your OpenClaw domain>"]` (exact, with `https://`)
+- `allowUsers`     → your Cloudflare Access email(s)
+- `trustedProxies` → keep `["172.28.0.2/32"]` (Caddy's fixed IP from compose)
+
+`gateway.auth.mode: "trusted-proxy"` supplies the auth, so no gateway token is
+needed — and it must **not** be set (the two are mutually exclusive).
+
+## 6. Start & verify the gateway
 
 ```bash
 docker compose up -d
-docker compose logs -f openclaw-gateway    # watch until it's serving on :18789, then Ctrl-C
+docker compose logs -f openclaw-gateway
 ```
 
-## 6. Enable trusted-proxy auth
+Expect `loading configuration… → resolving authentication…` then serving on `:18789`.
 
-Merge the `gateway` block from `openclaw/config/openclaw.gateway-snippet.json`
-into the generated `openclaw/config/openclaw.json` (keep any other keys the
-gateway already wrote). Edit these values in the snippet first:
-
-- `allowedOrigins`  → `["https://openclaw.example.com"]`
-- `allowUsers`      → your Access email(s)
-- `trustedProxies`  → keep `["172.28.0.2/32"]` (Caddy's fixed IP from compose)
-
-Then restart and confirm auth mode is active:
-
-```bash
-docker compose restart openclaw-gateway
-docker compose logs --tail=50 openclaw-gateway   # should show trusted-proxy auth, no token error
-```
-
-> If startup errors about a token being set, ensure `OPENCLAW_GATEWAY_TOKEN` is
-> **not** in your `.env`/environment and `gateway.auth.token` is **not** in
-> `openclaw.json` — trusted-proxy mode refuses to run alongside a shared token.
+- **`Missing config … exit 78`** → `openclaw.json` isn't present/readable. Recheck §5:
+  file at `openclaw/config/openclaw.json`, owned `1000:1000`, valid JSON.
+- **`EACCES … mkdir '/home/node/.openclaw/state'`** → dir ownership; rerun
+  `sudo chown -R 1000:1000 openclaw/config openclaw/secret`.
+- **Token error** → ensure `OPENCLAW_GATEWAY_TOKEN` is not set and
+  `gateway.auth.token` is not in `openclaw.json` (mutually exclusive with trusted-proxy).
 
 ## 7. Lock the origin to Cloudflare (REQUIRED)
 
@@ -295,9 +303,10 @@ Sources: [Hermes web dashboard docs](https://hermes-agent.nousresearch.com/docs/
 - **WebSockets:** the Control UI uses WS; Cloudflare proxied + Access + Caddy
   all pass WebSockets through by default. `allowedOrigins` must exactly match
   your `https://` origin or the WS handshake is rejected.
-- **`bind: "all"`** makes the gateway listen on its container interface so Caddy
-  can reach it. The port is never published to the host and is firewalled, so
-  this is safe here.
+- **`bind: "lan"`** makes the gateway listen on its private/LAN container interface
+  (`172.28.0.3`) so Caddy can reach it. Valid values are `loopback`, `lan`, `tailnet`,
+  `auto`, `custom` — **not** `all`. The port is never published to the host and is
+  firewalled, so `lan` is safe here.
 - **Origin cert requires the proxy ON** — a Cloudflare Origin cert is trusted
   only by Cloudflare, so it works precisely because your record is proxied
   (orange). This is the same proxy setting Access needs, so they align.
