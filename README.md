@@ -141,16 +141,33 @@ docker compose logs --tail=50 openclaw-gateway   # should show trusted-proxy aut
 ## 7. Lock the origin to Cloudflare (REQUIRED)
 
 Because the gateway trusts a header, an exposed origin = full auth bypass.
-Docker bypasses `ufw`, so use the provided script (filters the `DOCKER-USER`
-chain):
+Docker bypasses `ufw`, so the script filters the `DOCKER-USER` chain. Install it
+as a systemd unit so it re-applies at boot **and** whenever the Docker daemon
+restarts (Docker rebuilds its chains each time it starts):
 
 ```bash
-sudo bash scripts/lock-origin-to-cloudflare.sh
+# 1. Install the script and the unit
+sudo install -m 0755 scripts/lock-origin-to-cloudflare.sh /usr/local/sbin/lock-origin-to-cloudflare.sh
+sudo install -m 0644 scripts/cloudflare-lock.service /etc/systemd/system/cloudflare-lock.service
 
-# also allow SSH from your admin IP and enable ufw for everything else:
+# 2. Enable + run now (and on every boot, ordered after docker.service)
+sudo systemctl daemon-reload
+sudo systemctl enable --now cloudflare-lock.service
+
+# 3. Verify
+systemctl status cloudflare-lock.service --no-pager
+sudo iptables -S DOCKER-USER          # should list Cloudflare ranges then a DROP on :443
+
+# Also allow SSH from your admin IP and enable ufw for host-level (non-Docker) ports:
 sudo ufw allow from <YOUR_ADMIN_IP> to any port 22 proto tcp
 sudo ufw --force enable
 ```
+
+> **Don't** use `iptables-persistent` / `netfilter-persistent save` on a Docker
+> host — restoring a saved snapshot conflicts with Docker's dynamically-created
+> chains and can break container networking. The systemd unit above rebuilds the
+> rules fresh against the live chain instead, which is conflict-free. To refresh
+> Cloudflare's IP list later: `sudo systemctl restart cloudflare-lock.service`.
 
 ## 8. Verify
 
@@ -164,6 +181,28 @@ curl -m 5 -k https://<SERVER_PUBLIC_IP>/ -H "Host: openclaw.example.com" ; echo
 ```
 
 Add your LLM provider API keys from inside the Control UI once you're in.
+
+## 9. Auto-start on boot (systemd)
+
+Two mechanisms, two jobs:
+
+- **`restart: unless-stopped`** (already set on every service) recovers containers
+  when the Docker daemon restarts or a container crashes. Make sure Docker itself
+  starts at boot: `sudo systemctl enable docker`.
+- **`openclaw-stack.service`** guarantees the stack is brought up at boot and gives
+  you one-command control of the whole project.
+
+```bash
+sudo mv ~/openclaw-caddy /opt/openclaw-caddy    # stable path (edit WorkingDirectory if different)
+sudo install -m 0644 /opt/openclaw-caddy/scripts/openclaw-stack.service /etc/systemd/system/openclaw-stack.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now openclaw-stack.service
+sudo systemctl status openclaw-stack.service --no-pager
+```
+
+The `cloudflare-lock.service` (§7) and `openclaw-stack.service` are independent —
+the firewall rules filter by port and don't depend on the containers being up, so
+ordering between them doesn't matter.
 
 ---
 

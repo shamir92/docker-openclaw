@@ -1,0 +1,16 @@
+[Unit]
+Description=Lock origin tcp/443 to Cloudflare IPs (DOCKER-USER firewall)
+# Docker creates DOCKER-USER when it starts, so we must run after it.
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+# PartOf makes this unit re-run whenever docker is restarted, not just at boot.
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/lock-origin-to-cloudflare.sh
+
+[Install]
+WantedBy=multi-user.target
