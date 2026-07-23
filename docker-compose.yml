@@ -37,6 +37,10 @@ services:
   openclaw-gateway:
     image: ghcr.io/openclaw/openclaw:latest   # pin a version tag in production
     container_name: openclaw-gateway
+    # Headless deploy: skip the interactive `setup` gate; trusted-proxy auth from
+    # openclaw.json is still applied. (Image entrypoint is tini; default CMD is
+    # `node openclaw.mjs gateway`, which we extend with the flag.)
+    command: ["node", "openclaw.mjs", "gateway", "--allow-unconfigured"]
     restart: unless-stopped
     networks:
       edge:

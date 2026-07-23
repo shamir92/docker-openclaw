@@ -139,8 +139,14 @@ docker compose logs -f openclaw-gateway
 
 Expect `loading configuration… → resolving authentication…` then serving on `:18789`.
 
-- **`Missing config … exit 78`** → `openclaw.json` isn't present/readable. Recheck §5:
-  file at `openclaw/config/openclaw.json`, owned `1000:1000`, valid JSON.
+- **`Missing config … exit 78`** → remote mode otherwise wants the interactive
+  `openclaw setup`; the compose `command:` includes `--allow-unconfigured` to bypass
+  that and use your `openclaw.json` instead. Make sure that flag is present, and that
+  `openclaw.json` exists at `openclaw/config/openclaw.json`, is valid JSON, and is
+  readable by uid 1000.
+- **`[FATAL tini (7)] exec <x> failed`** → you passed a bare subcommand. The CLI is
+  `node openclaw.mjs <subcommand>` (entrypoint is tini), e.g.
+  `docker compose run --rm --no-deps openclaw-gateway node openclaw.mjs doctor`.
 - **`EACCES … mkdir '/home/node/.openclaw/state'`** → dir ownership; rerun
   `sudo chown -R 1000:1000 openclaw/config openclaw/secret`.
 - **Token error** → ensure `OPENCLAW_GATEWAY_TOKEN` is not set and
