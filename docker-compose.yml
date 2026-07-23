@@ -1,0 +1,49 @@
+name: openclaw-stack
+
+networks:
+  edge:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+
+services:
+  caddy:
+    build:
+      context: ./caddy
+    image: caddy-cloudflare:local
+    container_name: caddy
+    restart: unless-stopped
+    networks:
+      edge:
+        ipv4_address: 172.28.0.2
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    environment:
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/data:/data
+      - ./caddy/config:/config
+    depends_on:
+      - openclaw-gateway
+
+  openclaw-gateway:
+    image: ghcr.io/openclaw/openclaw:latest   # pin a version tag in production
+    container_name: openclaw-gateway
+    restart: unless-stopped
+    networks:
+      edge:
+        ipv4_address: 172.28.0.3
+    expose:
+      - "18789"          # internal only — NOT published to the host
+    environment:
+      OPENCLAW_SKIP_ONBOARDING: "1"
+      # Do NOT set OPENCLAW_GATEWAY_TOKEN — it is mutually exclusive with trusted-proxy auth.
+    volumes:
+      - ./openclaw/config:/home/node/.openclaw
+      - ./openclaw/secret:/home/node/.config/openclaw

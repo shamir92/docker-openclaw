@@ -1,0 +1,20 @@
+{
+  "gateway": {
+    "bind": "all",
+    "allowedOrigins": ["https://openclaw.example.com"],
+    "trustedProxies": ["172.28.0.2/32"],
+    "auth": {
+      "mode": "trusted-proxy",
+      "trustedProxy": {
+        "userHeader": "x-forwarded-user",
+        "requiredHeaders": ["x-forwarded-proto", "x-forwarded-host"],
+        "allowUsers": ["you@example.com"],
+        "allowLoopback": false,
+        "deviceAutoApprove": {
+          "enabled": true,
+          "scopes": ["operator.read", "operator.write", "operator.approvals"]
+        }
+      }
+    }
+  }
+}
