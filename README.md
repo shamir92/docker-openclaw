@@ -29,7 +29,7 @@ Files in this folder:
 | `.env.example` | Domains + Hermes Basic Auth creds (no API token needed with Origin cert) |
 
 > **Running Hermes Agent too?** See [Adding Hermes Agent on a second domain](#adding-hermes-agent-on-a-second-domain) at the bottom. If so, generate your Origin cert as a **wildcard** `*.example.com` in step 2 so it covers both hostnames.
-| `openclaw/config/openclaw.gateway-snippet.json` | The `gateway` block to merge into the generated config |
+| `openclaw/config/openclaw.snippet.json` | Config template — `cp` it to `openclaw.json` (never read directly by the gateway) |
 | `scripts/lock-origin-to-cloudflare.sh` | Firewall the origin to Cloudflare IPs (**required**) |
 
 Replace `openclaw.example.com` / `you@example.com` everywhere with your real values.
@@ -116,14 +116,17 @@ without a config it exits 78 "Missing config".) Create `openclaw.json` from the
 provided snippet:
 
 ```bash
-sudo cp openclaw/config/openclaw.gateway-snippet.json openclaw/config/openclaw.json
+sudo cp openclaw/config/openclaw.snippet.json openclaw/config/openclaw.json
 sudo nano openclaw/config/openclaw.json      # edit the values below
 sudo chown 1000:1000 openclaw/config/openclaw.json
 ```
 
+The file **must** be named exactly `openclaw.json` — the gateway ignores any other
+name (e.g. `openclaw.gateway.json`) and silently falls back to defaults (`bind=auto`,
+no auth config), which surfaces later as confusing "no trustedProxy config" errors.
 Edit these values:
 
-- `allowedOrigins` → `["https://<your OpenClaw domain>"]` (exact, with `https://`)
+- `controlUi.allowedOrigins` → `["https://<your OpenClaw domain>"]` (exact, with `https://`; the key is under `gateway.controlUi`, **not** `gateway.allowedOrigins`)
 - `allowUsers`     → your Cloudflare Access email(s)
 - `trustedProxies` → keep `["172.28.0.2/32"]` (Caddy's fixed IP from compose)
 
