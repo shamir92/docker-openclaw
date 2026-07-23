@@ -1,7 +1,7 @@
 # OpenClaw + Caddy + Cloudflare (Access / trusted-proxy auth)
 
 Self-hosted OpenClaw gateway behind Caddy, with Cloudflare DNS (proxied/orange),
-TLS via the Cloudflare DNS-01 challenge, and authentication delegated to
+TLS via a **Cloudflare Origin Certificate**, and authentication delegated to
 **Cloudflare Access** using OpenClaw's **trusted-proxy** auth model.
 
 ```
@@ -22,10 +22,11 @@ Files in this folder:
 
 | Path | What it is |
 |------|------------|
-| `docker-compose.yml` | Caddy + OpenClaw gateway on an isolated bridge network |
-| `caddy/Dockerfile` | Caddy built with the `caddy-dns/cloudflare` plugin |
-| `caddy/Caddyfile` | TLS + reverse proxy + Access→header mapping |
-| `.env.example` | Domain, ACME email, Cloudflare API token |
+| `docker-compose.yml` | Caddy (stock `caddy:2`) + OpenClaw gateway on an isolated bridge network |
+| `caddy/Dockerfile` | Optional — only for the Let's Encrypt DNS-01 alternative (not used by default) |
+| `caddy/Caddyfile` | TLS (Origin cert) + reverse proxy + Access→header mapping |
+| `caddy/certs/` | Drop your Cloudflare Origin cert (`origin.pem`) + key (`origin-key.pem`) here |
+| `.env.example` | Just your domain (no API token needed with Origin cert) |
 | `openclaw/config/openclaw.gateway-snippet.json` | The `gateway` block to merge into the generated config |
 | `scripts/lock-origin-to-cloudflare.sh` | Firewall the origin to Cloudflare IPs (**required**) |
 
@@ -43,7 +44,7 @@ sudo usermod -aG docker "$USER"   # log out/in afterwards
 # Copy this folder to the server, then:
 cd openclaw-caddy
 cp .env.example .env
-$EDITOR .env                       # set DOMAIN, ACME_EMAIL, CLOUDFLARE_API_TOKEN
+$EDITOR .env                       # set DOMAIN
 ```
 
 ---
@@ -56,16 +57,28 @@ In the Cloudflare dashboard for your zone → **DNS → Records**:
 - **Proxy status: Proxied (orange cloud).**
 
 Then **SSL/TLS → Overview → set encryption mode to `Full (strict)`.**
-(Caddy will hold a real Let's Encrypt cert, so strict validation passes.)
+(Caddy will hold a Cloudflare Origin cert, which `Full (strict)` validates.)
 Also enable **SSL/TLS → Edge Certificates → Always Use HTTPS**.
 
-## 2. Cloudflare API token (for Caddy's TLS)
+## 2. Cloudflare Origin Certificate (for the Cloudflare→Caddy leg)
 
-**My Profile → API Tokens → Create Token → "Edit zone DNS" template**:
-- Permissions: `Zone → DNS → Edit` **and** `Zone → Zone → Read`
-- Zone Resources: Include → your zone
+**SSL/TLS → Origin Server → Create Certificate:**
 
-Put the token in `.env` as `CLOUDFLARE_API_TOKEN`.
+1. Leave "Generate private key and CSR with Cloudflare" selected.
+2. Hostnames: `openclaw.example.com` (or `*.example.com`).
+3. Validity: up to 15 years → **Create**.
+4. You'll be shown two PEM blocks (the key is shown **only once**):
+   - **Origin Certificate** → save to `caddy/certs/origin.pem`
+   - **Private Key** → save to `caddy/certs/origin-key.pem`
+
+```bash
+mkdir -p caddy/certs
+$EDITOR caddy/certs/origin.pem       # paste the Origin Certificate
+$EDITOR caddy/certs/origin-key.pem   # paste the Private Key
+chmod 600 caddy/certs/origin-key.pem
+```
+
+No API token is required for this method.
 
 ## 3. Cloudflare Access (Zero Trust) — this is the "auth"
 
@@ -98,7 +111,7 @@ sudo chown -R 1000:1000 openclaw/config openclaw/secret
 Bring up the gateway once so it writes a default `openclaw.json`:
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 docker compose logs -f openclaw-gateway    # watch until it's serving on :18789, then Ctrl-C
 ```
 
@@ -179,8 +192,11 @@ Add your LLM provider API keys from inside the Control UI once you're in.
 - **`bind: "all"`** makes the gateway listen on its container interface so Caddy
   can reach it. The port is never published to the host and is firewalled, so
   this is safe here.
-- **DNS-01 works behind orange cloud** — Caddy writes a temporary `_acme-challenge`
-  TXT record via the API; proxy status doesn't matter for DNS validation.
+- **Origin cert requires the proxy ON** — a Cloudflare Origin cert is trusted
+  only by Cloudflare, so it works precisely because your record is proxied
+  (orange). This is the same proxy setting Access needs, so they align.
+  Cloudflare SSL mode **must** be `Full (strict)` (not Flexible — Flexible would
+  talk plain HTTP to your origin and break the `tls` directive).
 - **Adding users later:** add their email to the Cloudflare Access policy *and*
   to `allowUsers` in `openclaw.json` (or leave `allowUsers` empty to accept any
   Access-authenticated user).

@@ -1,14 +1,7 @@
-{
-	email {$ACME_EMAIL}
-}
-
 {$DOMAIN} {
-	# TLS cert via Let's Encrypt using the Cloudflare DNS-01 challenge.
-	# Works even when the DNS record is proxied (orange cloud).
-	tls {
-		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-		resolvers 1.1.1.1 1.0.0.1
-	}
+	# Cloudflare Origin Certificate (the Cloudflare -> origin leg).
+	# Requires Cloudflare SSL/TLS mode = Full (strict) and a proxied (orange) record.
+	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin-key.pem
 
 	encode zstd gzip
 

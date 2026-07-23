@@ -9,9 +9,7 @@ networks:
 
 services:
   caddy:
-    build:
-      context: ./caddy
-    image: caddy-cloudflare:local
+    image: caddy:2                       # stock image — no custom build needed
     container_name: caddy
     restart: unless-stopped
     networks:
@@ -22,11 +20,10 @@ services:
       - "443:443"
       - "443:443/udp"   # HTTP/3
     environment:
-      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
       DOMAIN: ${DOMAIN}
-      ACME_EMAIL: ${ACME_EMAIL}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/certs:/etc/caddy/certs:ro   # Cloudflare Origin cert + key live here
       - ./caddy/data:/data
       - ./caddy/config:/config
     depends_on:
